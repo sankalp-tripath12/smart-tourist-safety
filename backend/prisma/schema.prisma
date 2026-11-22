@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tourist {
+  id                   String   @id @default(cuid())
+  touristCode          String   @unique
+  fullName             String
+  phone                String
+  email                String?
+  emergencyContactName String
+  emergencyContactPhone String
+  itinerary            String?
+  visitExpiry          DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
