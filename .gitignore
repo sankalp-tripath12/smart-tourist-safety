@@ -8,3 +8,10 @@ build/
 coverage/
 *.db-journal
 .DS_Store
+
+backend/*.db
+backend/*.db-journal
+backend/.agents/
+backend/.claude/
+backend/.windsurf/
+backend/skills-lock.json
