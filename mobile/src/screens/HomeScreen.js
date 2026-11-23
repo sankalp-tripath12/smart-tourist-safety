@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   Pressable,
@@ -7,16 +7,112 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import colors from '../constants/colors';
+import SafetyScoreCard from '../components/SafetyScoreCard';
+import LocationCard from '../components/LocationCard';
+import SosModal from '../components/SosModal';
+import {
+  getTourists,
+  getSafetyScore,
+  getSafetyZones,
+  getTouristAnomalies,
+} from '../services/api';
+import { getCurrentCoordinates, checkLocationPermissions } from '../services/locationService';
+import { evaluateLocalGeoFences } from '../services/geoFenceService';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
+  const [tourist, setTourist] = useState(null);
   const [showIdDetails, setShowIdDetails] = useState(false);
+  const [coordinates, setCoordinates] = useState({
+    latitude: 26.9855,
+    longitude: 75.8513,
+    accuracy: 10,
+    isSimulated: false,
+  });
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [locLoading, setLocLoading] = useState(false);
+  const [safetyScoreData, setSafetyScoreData] = useState(null);
+  const [activeZone, setActiveZone] = useState(null);
+  const [recentAlerts, setRecentAlerts] = useState([]);
+  const [sosModalVisible, setSosModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch tourist
+      let currentTourist = null;
+      const touristRes = await getTourists();
+      if (touristRes?.data && touristRes.data.length > 0) {
+        currentTourist = touristRes.data[0];
+        setTourist(currentTourist);
+      }
+
+      // 2. Check location permissions
+      const perm = await checkLocationPermissions();
+      setPermissionGranted(perm.granted);
+
+      // 3. Fetch zones & evaluate current proximity
+      const zonesRes = await getSafetyZones();
+      const zones = zonesRes?.data || [];
+      const geoEval = evaluateLocalGeoFences(coordinates.latitude, coordinates.longitude, zones);
+      if (geoEval.insideZones.length > 0) {
+        setActiveZone(geoEval.insideZones[0]);
+      } else if (geoEval.nearestZone) {
+        setActiveZone(geoEval.nearestZone);
+      }
+
+      // 4. Fetch safety score & alerts
+      if (currentTourist?.id) {
+        const [scoreRes, alertRes] = await Promise.all([
+          getSafetyScore(currentTourist.id, coordinates.latitude, coordinates.longitude),
+          getTouristAnomalies(currentTourist.id),
+        ]);
+        if (scoreRes?.data) setSafetyScoreData(scoreRes.data);
+        if (alertRes?.data) setRecentAlerts(alertRes.data);
+      }
+    } catch (err) {
+      console.log('Dashboard load error:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefreshLocation = async () => {
+    setLocLoading(true);
+    try {
+      const coords = await getCurrentCoordinates();
+      setCoordinates(coords);
+      setPermissionGranted(true);
+
+      const zonesRes = await getSafetyZones();
+      const zones = zonesRes?.data || [];
+      const geoEval = evaluateLocalGeoFences(coords.latitude, coords.longitude, zones);
+      setActiveZone(geoEval.insideZones[0] || geoEval.nearestZone);
+
+      if (tourist?.id) {
+        const scoreRes = await getSafetyScore(tourist.id, coords.latitude, coords.longitude);
+        if (scoreRes?.data) setSafetyScoreData(scoreRes.data);
+      }
+    } catch (err) {
+      Alert.alert('Location Update', err.message);
+    } finally {
+      setLocLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F4F7FB" />
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.brand}>SAFETRAVEL</Text>
@@ -24,47 +120,49 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.profile}>
-            <Text style={styles.profileText}>T</Text>
+            <Text style={styles.profileText}>
+              {tourist?.fullName ? tourist.fullName.charAt(0) : 'T'}
+            </Text>
           </View>
         </View>
 
+        {/* Welcome Section */}
         <View style={styles.welcome}>
-          <Text style={styles.welcomeTitle}>Welcome, Tourist!</Text>
+          <Text style={styles.welcomeTitle}>
+            Welcome, {tourist?.fullName || 'Valued Tourist'}!
+          </Text>
           <Text style={styles.subtitle}>
-            Your journey matters. Stay safe wherever you go.
+            Your real-time AI geo-fence & safety monitoring is active.
           </Text>
         </View>
 
-        <View style={styles.safetyCard}>
-          <View style={styles.safetyTop}>
-            <Text style={styles.cardLabel}>YOUR SAFETY STATUS</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>DEMO</Text>
-            </View>
-          </View>
+        {/* Live Safety Score Engine Component */}
+        <SafetyScoreCard scoreData={safetyScoreData} />
 
-          <Text style={styles.safetyTitle}>Safety monitoring is ready</Text>
-          <Text style={styles.safetyDescription}>
-            Location monitoring is not connected yet. Complete your setup
-            to activate safety features.
-          </Text>
-          <View style={styles.progressTrack}>
-            <View style={styles.progressFill} />
-          </View>
-          <Text style={styles.progressLabel}>Setup in progress</Text>
-        </View>
+        {/* Live GPS Location Summary Card */}
+        <LocationCard
+          coordinates={coordinates}
+          loading={locLoading}
+          permissionGranted={permissionGranted}
+          onRefresh={handleRefreshLocation}
+          onPickPreset={() => navigation?.navigate('Location')}
+        />
 
-        <Text style={styles.sectionTitle}>Your Digital Tourist ID</Text>
+        {/* Digital Tourist ID Section */}
+        <Text style={styles.sectionTitle}>Digital Tourist ID</Text>
 
         <View style={styles.idCard}>
           <View style={styles.idHeader}>
-            <Text style={styles.idHeaderText}>DIGITAL TOURIST ID</Text>
+            <Text style={styles.idHeaderText}>VERIFIED DIGITAL ID</Text>
             <Text style={styles.idIcon}>✦</Text>
           </View>
 
-          <Text style={styles.idNumber}>ST-2026-DEMO-001</Text>
+          <Text style={styles.idNumber}>
+            {tourist?.touristCode || 'TST-2026-DEMO-001'}
+          </Text>
           <Text style={styles.idNote}>
-            Sample identity for project demonstration
+            {tourist?.fullName || 'Demo Tourist'} •{' '}
+            {tourist?.itinerary || 'Golden Triangle Corridor'}
           </Text>
 
           <Pressable
@@ -78,60 +176,146 @@ export default function HomeScreen() {
 
           {showIdDetails && (
             <View style={styles.idDetails}>
-              <Text style={styles.detailText}>Name: Demo Tourist</Text>
-              <Text style={styles.detailText}>Status: Sample ID</Text>
-              <Text style={styles.detailText}>Verification: Not connected</Text>
+              <Text style={styles.detailText}>
+                <Text style={styles.detailBold}>Name:</Text>{' '}
+                {tourist?.fullName || 'Aarav Sharma'}
+              </Text>
+              <Text style={styles.detailText}>
+                <Text style={styles.detailBold}>Phone:</Text>{' '}
+                {tourist?.phone || '9876543210'}
+              </Text>
+              <Text style={styles.detailText}>
+                <Text style={styles.detailBold}>Emergency Contact:</Text>{' '}
+                {tourist?.emergencyContactName || 'Raj Sharma'} (
+                {tourist?.emergencyContactPhone || '9876501234'})
+              </Text>
+              <Text style={styles.detailText}>
+                <Text style={styles.detailBold}>Valid Until:</Text>{' '}
+                {tourist?.visitExpiry
+                  ? new Date(tourist.visitExpiry).toLocaleDateString()
+                  : 'Dec 31, 2027'}
+              </Text>
             </View>
           )}
         </View>
 
+        {/* Geo-Fence Status Banner */}
+        {activeZone && (
+          <View style={styles.zoneBanner}>
+            <View style={styles.zoneBannerTop}>
+              <Text style={styles.zoneBannerLabel}>PROXIMITY STATUS</Text>
+              <View
+                style={[
+                  styles.zoneBadge,
+                  {
+                    backgroundColor:
+                      activeZone.riskLevel === 'DANGER'
+                        ? '#FEE2E2'
+                        : activeZone.riskLevel === 'CAUTION'
+                        ? '#FEF3C7'
+                        : '#E6F4EA',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.zoneBadgeText,
+                    {
+                      color:
+                        activeZone.riskLevel === 'DANGER'
+                          ? colors.danger
+                          : activeZone.riskLevel === 'CAUTION'
+                          ? '#D97706'
+                          : colors.secondary,
+                    },
+                  ]}
+                >
+                  {activeZone.riskLevel}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.zoneName}>{activeZone.name}</Text>
+            <Text style={styles.zoneDesc}>
+              {activeZone.isInside
+                ? '● You are currently INSIDE this perimeter.'
+                : `Nearest designated zone (~${activeZone.distanceMeters || '250'}m away).`}
+            </Text>
+          </View>
+        )}
+
+        {/* Safety Navigation Grid */}
         <Text style={styles.sectionTitle}>Safety Services</Text>
 
         <View style={styles.services}>
-          <View style={styles.serviceCard}>
+          <Pressable
+            style={styles.serviceCard}
+            onPress={() => navigation?.navigate('Location')}
+          >
             <Text style={styles.serviceIcon}>⌖</Text>
-            <Text style={styles.serviceTitle}>Location</Text>
-            <Text style={styles.serviceDescription}>Coming soon</Text>
-          </View>
+            <Text style={styles.serviceTitle}>Location & Zones</Text>
+            <Text style={styles.serviceDescription}>
+              GPS Coordinates & Geo-Fencing
+            </Text>
+          </Pressable>
 
-          <View style={styles.serviceCard}>
+          <Pressable
+            style={styles.serviceCard}
+            onPress={() => navigation?.navigate('Safety')}
+          >
             <Text style={styles.serviceIcon}>◎</Text>
-            <Text style={styles.serviceTitle}>Geo-fencing</Text>
-            <Text style={styles.serviceDescription}>Coming soon</Text>
-          </View>
+            <Text style={styles.serviceTitle}>Safety Engine</Text>
+            <Text style={styles.serviceDescription}>
+              Rule Engine & Anomalies
+            </Text>
+          </Pressable>
 
-          <View style={styles.serviceCard}>
+          <Pressable
+            style={styles.serviceCard}
+            onPress={() => navigation?.navigate('Incidents')}
+          >
             <Text style={styles.serviceIcon}>◈</Text>
-            <Text style={styles.serviceTitle}>Safety alerts</Text>
-            <Text style={styles.serviceDescription}>Coming soon</Text>
-          </View>
+            <Text style={styles.serviceTitle}>Incident History</Text>
+            <Text style={styles.serviceDescription}>
+              SOS & Anomaly Audit Trail
+            </Text>
+          </Pressable>
 
-          <View style={styles.serviceCard}>
+          <Pressable
+            style={styles.serviceCard}
+            onPress={() => navigation?.navigate('Tourist ID')}
+          >
             <Text style={styles.serviceIcon}>▣</Text>
-            <Text style={styles.serviceTitle}>Travel history</Text>
-            <Text style={styles.serviceDescription}>Coming soon</Text>
-          </View>
+            <Text style={styles.serviceTitle}>Digital ID</Text>
+            <Text style={styles.serviceDescription}>
+              Identity & Registration
+            </Text>
+          </Pressable>
         </View>
 
+        {/* SOS Button */}
         <Pressable
           style={styles.sosButton}
-          onPress={() =>
-            Alert.alert(
-              'Demo SOS',
-              'This is a visual demo. Emergency services are not connected yet.'
-            )
-          }
+          onPress={() => setSosModalVisible(true)}
         >
           <Text style={styles.sosTitle}>SOS Emergency</Text>
           <Text style={styles.sosSubtitle}>
-            Emergency functionality will be implemented next
+            Tap to open two-step emergency incident broadcast
           </Text>
         </Pressable>
 
         <Text style={styles.footer}>
-          SMART TOURIST SAFETY • PROJECT DEMO
+          SMART TOURIST SAFETY • COLLEGE MVP DEMO • DAY 2 COMPLETE
         </Text>
       </ScrollView>
+
+      {/* SOS Modal */}
+      <SosModal
+        visible={sosModalVisible}
+        onClose={() => setSosModalVisible(false)}
+        tourist={tourist}
+        coordinates={coordinates}
+        onSosSuccess={() => loadDashboard()}
+      />
     </View>
   );
 }
@@ -177,88 +361,32 @@ const styles = StyleSheet.create({
     color: '#147D78',
   },
   welcome: {
-    marginTop: 30,
-    marginBottom: 22,
+    marginTop: 24,
+    marginBottom: 18,
   },
   welcomeTitle: {
-    fontSize: 21,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#172B4D',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#718096',
-    marginTop: 7,
-    lineHeight: 20,
-  },
-  safetyCard: {
-    backgroundColor: '#173B57',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 27,
-  },
-  safetyTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardLabel: {
-    color: '#B8D5DF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  statusBadge: {
-    backgroundColor: '#FCE9C5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  statusText: {
-    color: '#875A13',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  safetyTitle: {
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: '700',
-    marginTop: 19,
-  },
-  safetyDescription: {
-    color: '#D1E0E8',
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#496477',
-    borderRadius: 5,
-    marginTop: 20,
-  },
-  progressFill: {
-    width: '35%',
-    height: 6,
-    backgroundColor: '#61C5B4',
-    borderRadius: 5,
-  },
-  progressLabel: {
-    color: '#B8D5DF',
-    fontSize: 11,
-    marginTop: 8,
+    marginTop: 5,
+    lineHeight: 18,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#172B4D',
-    marginBottom: 13,
+    marginBottom: 12,
+    marginTop: 8,
   },
   idCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 19,
-    marginBottom: 27,
+    padding: 18,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5EAF0',
   },
@@ -274,87 +402,130 @@ const styles = StyleSheet.create({
   },
   idIcon: {
     color: '#147D78',
-    fontSize: 22,
+    fontSize: 18,
   },
   idNumber: {
     fontSize: 20,
     fontWeight: '800',
     color: '#172B4D',
-    marginTop: 20,
+    marginTop: 12,
   },
   idNote: {
     color: '#8290A2',
-    fontSize: 11,
-    marginTop: 6,
+    fontSize: 12,
+    marginTop: 4,
   },
   idButton: {
     backgroundColor: '#E6F3F1',
-    padding: 12,
-    borderRadius: 9,
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 17,
+    marginTop: 14,
   },
   idButtonText: {
     color: '#147D78',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
   idDetails: {
     borderTopWidth: 1,
     borderTopColor: '#E8EDF2',
-    marginTop: 15,
-    paddingTop: 12,
-    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    gap: 6,
   },
   detailText: {
     color: '#526276',
     fontSize: 12,
+  },
+  detailBold: {
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  zoneBanner: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  zoneBannerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  zoneBannerLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.muted,
+    letterSpacing: 1,
+  },
+  zoneBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  zoneBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  zoneName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: 6,
+  },
+  zoneDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
   services: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     rowGap: 12,
-    marginBottom: 25,
+    marginBottom: 20,
   },
   serviceCard: {
     width: '48%',
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    padding: 15,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E8EDF2',
   },
   serviceIcon: {
-    fontSize: 25,
+    fontSize: 22,
     color: '#147D78',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   serviceTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#243B53',
   },
   serviceDescription: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#8290A2',
-    marginTop: 5,
+    marginTop: 3,
   },
   sosButton: {
     backgroundColor: '#B83240',
     borderRadius: 14,
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
   },
   sosTitle: {
     color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
   },
   sosSubtitle: {
     color: '#FBE3E5',
     fontSize: 11,
-    marginTop: 6,
+    marginTop: 4,
     textAlign: 'center',
   },
   footer: {
