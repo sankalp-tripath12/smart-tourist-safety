@@ -8,15 +8,64 @@ datasource db {
 }
 
 model Tourist {
-  id                   String   @id @default(cuid())
-  touristCode          String   @unique
-  fullName             String
-  phone                String
-  email                String?
-  emergencyContactName String
+  id                    String         @id @default(cuid())
+  touristCode           String         @unique
+  fullName              String
+  phone                 String
+  email                 String?
+  emergencyContactName  String
   emergencyContactPhone String
-  itinerary            String?
-  visitExpiry          DateTime
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  itinerary             String?
+  visitExpiry           DateTime
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  incidents             Incident[]
+  anomalyAlerts         AnomalyAlert[]
+}
+
+model SafetyZone {
+  id          String   @id @default(cuid())
+  name        String
+  latitude    Float
+  longitude   Float
+  radius      Float    // Radius in meters
+  riskLevel   String   // SAFE, CAUTION, DANGER
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([riskLevel])
+}
+
+model Incident {
+  id          String   @id @default(cuid())
+  touristId   String
+  type        String   // SOS, GEOFENCE_BREACH, ANOMALY, MEDICAL, etc.
+  status      String   @default("OPEN") // OPEN, ACKNOWLEDGED, RESOLVED, CANCELLED
+  severity    String   @default("HIGH") // LOW, MEDIUM, HIGH, CRITICAL
+  description String?
+  latitude    Float
+  longitude   Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tourist     Tourist  @relation(fields: [touristId], references: [id], onDelete: Cascade)
+
+  @@index([touristId])
+  @@index([status])
+}
+
+model AnomalyAlert {
+  id          String   @id @default(cuid())
+  touristId   String
+  type        String   // INACTIVITY, ROUTE_DEVIATION, SUDDEN_LOCATION_CHANGE, DANGER_ZONE_ENTRY, REPEATED_SUSPICIOUS_EVENTS
+  severity    String   // LOW, MEDIUM, HIGH, CRITICAL
+  description String
+  latitude    Float?
+  longitude   Float?
+  status      String   @default("ACTIVE") // ACTIVE, ACKNOWLEDGED, RESOLVED
+  createdAt   DateTime @default(now())
+  tourist     Tourist  @relation(fields: [touristId], references: [id], onDelete: Cascade)
+
+  @@index([touristId])
+  @@index([status])
 }
