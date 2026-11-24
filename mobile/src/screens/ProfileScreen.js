@@ -12,16 +12,26 @@ import {
 import colors from '../constants/colors';
 import AppHeader from '../components/AppHeader';
 import { getHealth, API_BASE_URL, setApiBaseUrl, getTourists } from '../services/api';
+import {
+  t,
+  AVAILABLE_LANGUAGES,
+  getCurrentLanguage,
+  setLanguage,
+  subscribeLanguageChange,
+} from '../i18n';
 
 export default function ProfileScreen() {
   const [tourist, setTourist] = useState(null);
   const [serverStatus, setServerStatus] = useState('Checking...');
   const [customUrl, setCustomUrl] = useState(API_BASE_URL);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [activeLang, setActiveLang] = useState(getCurrentLanguage());
 
   useEffect(() => {
     checkBackend();
     loadProfile();
+    const unsub = subscribeLanguageChange((newLang) => setActiveLang(newLang));
+    return unsub;
   }, []);
 
   const checkBackend = async () => {
@@ -54,12 +64,48 @@ export default function ProfileScreen() {
     checkBackend();
   };
 
+  const handleSelectLanguage = (langCode) => {
+    setLanguage(langCode);
+    setActiveLang(langCode);
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <AppHeader
-        title="Tourist Profile"
-        subtitle="Travel identity, backend config & project architecture"
+        title={t('profile_title')}
+        subtitle={t('profile_sub')}
       />
+
+      {/* Language Selector Card */}
+      <View style={styles.card}>
+        <View style={styles.langHeader}>
+          <Text style={styles.cardTitle}>🌐 {t('language_selector')}</Text>
+          <span style={styles.badgeInfo}>{AVAILABLE_LANGUAGES.length} Languages</span>
+        </View>
+        <Text style={styles.cardSub}>
+          Select your preferred regional language for all safety notifications and emergency interfaces.
+        </Text>
+
+        <View style={styles.langGrid}>
+          {AVAILABLE_LANGUAGES.map((lang) => {
+            const isSelected = activeLang === lang.code;
+            return (
+              <Pressable
+                key={lang.code}
+                style={[styles.langChip, isSelected && styles.langChipActive]}
+                onPress={() => handleSelectLanguage(lang.code)}
+              >
+                <Text style={[styles.langLocal, isSelected && styles.langLocalActive]}>
+                  {lang.localName}
+                </Text>
+                <Text style={[styles.langEnglish, isSelected && styles.langEnglishActive]}>
+                  {lang.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       {/* Tourist Profile Card */}
       <View style={styles.card}>
@@ -81,7 +127,7 @@ export default function ProfileScreen() {
 
         <View style={styles.infoList}>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>PHONE NUMBER</Text>
+            <Text style={styles.infoLabel}>{t('primary_phone')}</Text>
             <Text style={styles.infoValue}>{tourist?.phone || '9876543210'}</Text>
           </View>
 
@@ -93,7 +139,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>EMERGENCY CONTACT</Text>
+            <Text style={styles.infoLabel}>{t('emergency_contact')}</Text>
             <Text style={styles.infoValue}>
               {tourist?.emergencyContactName || 'Raj Sharma'} (
               {tourist?.emergencyContactPhone || '9876501234'})
@@ -101,7 +147,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>ITINERARY CORRIDOR</Text>
+            <Text style={styles.infoLabel}>{t('itinerary')}</Text>
             <Text style={styles.infoValue}>
               {tourist?.itinerary || 'Delhi to Jaipur to Agra'}
             </Text>
@@ -173,6 +219,9 @@ export default function ProfileScreen() {
         <Text style={styles.disclaimerItem}>
           • <Text style={styles.bold}>Foreground Location Priority:</Text> Respects privacy and Expo Go platform boundaries by monitoring GPS only during active foreground usage.
         </Text>
+        <Text style={styles.disclaimerItem}>
+          • <Text style={styles.bold}>Tamper-Evident Audit Ledger:</Text> Uses cryptographic SHA-256 hash chaining to link historical operations. It is an internal audit ledger, not a decentralized public blockchain.
+        </Text>
       </View>
     </ScrollView>
   );
@@ -195,6 +244,57 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 16,
+  },
+  langHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  badgeInfo: {
+    backgroundColor: '#E6F3F1',
+    color: colors.secondary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  langGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  langChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minWidth: '30%',
+    alignItems: 'center',
+  },
+  langChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  langLocal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  langLocalActive: {
+    color: '#FFFFFF',
+  },
+  langEnglish: {
+    fontSize: 9,
+    color: colors.muted,
+    marginTop: 1,
+  },
+  langEnglishActive: {
+    color: '#CBD5E1',
   },
   profileHeader: {
     flexDirection: 'row',

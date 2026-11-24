@@ -156,3 +156,20 @@ export function updateAnomalyStatus(id, status) {
     body: JSON.stringify({ status }),
   });
 }
+
+// QR Verification APIs
+export function getVerificationToken(touristId) {
+  return request("/verification/tokens", {
+    method: "POST",
+    body: JSON.stringify({ touristId }),
+  });
+}
+
+export function verifyQrToken(token) {
+  return request(`/verification/${encodeURIComponent(token)}`);
+}
+
+// Audit Ledger Verification
+export function verifyAuditLedger() {
+  return request("/audit-ledger/verify");
+}

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
 } from 'react-native';
 import colors from '../constants/colors';
 import SafetyScoreCard from '../components/SafetyScoreCard';
@@ -21,6 +20,7 @@ import {
 } from '../services/api';
 import { getCurrentCoordinates, checkLocationPermissions } from '../services/locationService';
 import { evaluateLocalGeoFences } from '../services/geoFenceService';
+import { t, subscribeLanguageChange } from '../i18n';
 
 export default function HomeScreen({ navigation }) {
   const [tourist, setTourist] = useState(null);
@@ -35,12 +35,15 @@ export default function HomeScreen({ navigation }) {
   const [locLoading, setLocLoading] = useState(false);
   const [safetyScoreData, setSafetyScoreData] = useState(null);
   const [activeZone, setActiveZone] = useState(null);
-  const [recentAlerts, setRecentAlerts] = useState([]);
+  const [, setRecentAlerts] = useState([]);
   const [sosModalVisible, setSosModalVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
+  const [, setLangTick] = useState(0);
 
   useEffect(() => {
     loadDashboard();
+    const unsub = subscribeLanguageChange(() => setLangTick((k) => k + 1));
+    return unsub;
   }, []);
 
   const loadDashboard = async () => {
@@ -115,24 +118,24 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.brand}>SAFETRAVEL</Text>
-            <Text style={styles.heading}>Tourist Dashboard</Text>
+            <Text style={styles.brand}>{t('app_name')}</Text>
+            <Text style={styles.heading}>{t('dashboard')}</Text>
           </View>
 
-          <View style={styles.profile}>
+          <Pressable style={styles.profile} onPress={() => navigation?.navigate('Profile')}>
             <Text style={styles.profileText}>
               {tourist?.fullName ? tourist.fullName.charAt(0) : 'T'}
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Welcome Section */}
         <View style={styles.welcome}>
           <Text style={styles.welcomeTitle}>
-            Welcome, {tourist?.fullName || 'Valued Tourist'}!
+            {t('welcome')}, {tourist?.fullName || 'Valued Tourist'}!
           </Text>
           <Text style={styles.subtitle}>
-            Your real-time AI geo-fence & safety monitoring is active.
+            {t('welcome_sub')}
           </Text>
         </View>
 
@@ -149,11 +152,11 @@ export default function HomeScreen({ navigation }) {
         />
 
         {/* Digital Tourist ID Section */}
-        <Text style={styles.sectionTitle}>Digital Tourist ID</Text>
+        <Text style={styles.sectionTitle}>{t('digital_id')}</Text>
 
         <View style={styles.idCard}>
           <View style={styles.idHeader}>
-            <Text style={styles.idHeaderText}>VERIFIED DIGITAL ID</Text>
+            <Text style={styles.idHeaderText}>{t('verified_id')}</Text>
             <Text style={styles.idIcon}>✦</Text>
           </View>
 
@@ -170,27 +173,27 @@ export default function HomeScreen({ navigation }) {
             onPress={() => setShowIdDetails(!showIdDetails)}
           >
             <Text style={styles.idButtonText}>
-              {showIdDetails ? 'Hide ID details' : 'View ID details'}
+              {showIdDetails ? t('hide_id_details') : t('view_id_details')}
             </Text>
           </Pressable>
 
           {showIdDetails && (
             <View style={styles.idDetails}>
               <Text style={styles.detailText}>
-                <Text style={styles.detailBold}>Name:</Text>{' '}
+                <Text style={styles.detailBold}>{t('holder_name')}:</Text>{' '}
                 {tourist?.fullName || 'Aarav Sharma'}
               </Text>
               <Text style={styles.detailText}>
-                <Text style={styles.detailBold}>Phone:</Text>{' '}
+                <Text style={styles.detailBold}>{t('primary_phone')}:</Text>{' '}
                 {tourist?.phone || '9876543210'}
               </Text>
               <Text style={styles.detailText}>
-                <Text style={styles.detailBold}>Emergency Contact:</Text>{' '}
+                <Text style={styles.detailBold}>{t('emergency_contact')}:</Text>{' '}
                 {tourist?.emergencyContactName || 'Raj Sharma'} (
                 {tourist?.emergencyContactPhone || '9876501234'})
               </Text>
               <Text style={styles.detailText}>
-                <Text style={styles.detailBold}>Valid Until:</Text>{' '}
+                <Text style={styles.detailBold}>{t('pass_expiry')}:</Text>{' '}
                 {tourist?.visitExpiry
                   ? new Date(tourist.visitExpiry).toLocaleDateString()
                   : 'Dec 31, 2027'}
@@ -244,7 +247,7 @@ export default function HomeScreen({ navigation }) {
         )}
 
         {/* Safety Navigation Grid */}
-        <Text style={styles.sectionTitle}>Safety Services</Text>
+        <Text style={styles.sectionTitle}>{t('services_title')}</Text>
 
         <View style={styles.services}>
           <Pressable
@@ -252,9 +255,9 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation?.navigate('Location')}
           >
             <Text style={styles.serviceIcon}>⌖</Text>
-            <Text style={styles.serviceTitle}>Location & Zones</Text>
+            <Text style={styles.serviceTitle}>{t('service_location')}</Text>
             <Text style={styles.serviceDescription}>
-              GPS Coordinates & Geo-Fencing
+              {t('service_location_sub')}
             </Text>
           </Pressable>
 
@@ -263,9 +266,9 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation?.navigate('Safety')}
           >
             <Text style={styles.serviceIcon}>◎</Text>
-            <Text style={styles.serviceTitle}>Safety Engine</Text>
+            <Text style={styles.serviceTitle}>{t('service_safety')}</Text>
             <Text style={styles.serviceDescription}>
-              Rule Engine & Anomalies
+              {t('service_safety_sub')}
             </Text>
           </Pressable>
 
@@ -274,9 +277,9 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation?.navigate('Incidents')}
           >
             <Text style={styles.serviceIcon}>◈</Text>
-            <Text style={styles.serviceTitle}>Incident History</Text>
+            <Text style={styles.serviceTitle}>{t('service_incidents')}</Text>
             <Text style={styles.serviceDescription}>
-              SOS & Anomaly Audit Trail
+              {t('service_incidents_sub')}
             </Text>
           </Pressable>
 
@@ -285,9 +288,9 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation?.navigate('Tourist ID')}
           >
             <Text style={styles.serviceIcon}>▣</Text>
-            <Text style={styles.serviceTitle}>Digital ID</Text>
+            <Text style={styles.serviceTitle}>{t('service_digital_id')}</Text>
             <Text style={styles.serviceDescription}>
-              Identity & Registration
+              {t('service_digital_id_sub')}
             </Text>
           </Pressable>
         </View>
@@ -297,14 +300,14 @@ export default function HomeScreen({ navigation }) {
           style={styles.sosButton}
           onPress={() => setSosModalVisible(true)}
         >
-          <Text style={styles.sosTitle}>SOS Emergency</Text>
+          <Text style={styles.sosTitle}>{t('sos_button_title')}</Text>
           <Text style={styles.sosSubtitle}>
-            Tap to open two-step emergency incident broadcast
+            {t('sos_button_sub')}
           </Text>
         </Pressable>
 
         <Text style={styles.footer}>
-          SMART TOURIST SAFETY • COLLEGE MVP DEMO • DAY 2 COMPLETE
+          SMART TOURIST SAFETY • COLLEGE MVP DEMO • DAY 3 INTEGRATED
         </Text>
       </ScrollView>
 

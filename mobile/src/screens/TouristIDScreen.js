@@ -8,17 +8,24 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
+import QRCode from 'qrcode';
 import colors from '../constants/colors';
 import AppHeader from '../components/AppHeader';
-import { getTourists, registerTourist } from '../services/api';
+import { getTourists, registerTourist, getVerificationToken } from '../services/api';
+import { t, subscribeLanguageChange } from '../i18n';
 
 export default function TouristIDScreen() {
   const [tourists, setTourists] = useState([]);
   const [selectedTourist, setSelectedTourist] = useState(null);
+  const [qrUri, setQrUri] = useState(null);
+  const [qrToken, setQrToken] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const [showRegForm, setShowRegForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [, setLangTick] = useState(0);
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -30,6 +37,8 @@ export default function TouristIDScreen() {
 
   useEffect(() => {
     fetchTouristsList();
+    const unsub = subscribeLanguageChange(() => setLangTick((k) => k + 1));
+    return unsub;
   }, []);
 
   const fetchTouristsList = async () => {
@@ -38,13 +47,40 @@ export default function TouristIDScreen() {
       const res = await getTourists();
       if (res?.data && res.data.length > 0) {
         setTourists(res.data);
-        setSelectedTourist(res.data[0]);
+        const tourist = res.data[0];
+        setSelectedTourist(tourist);
+        loadQrToken(tourist.id);
       }
     } catch (err) {
       console.log('Error fetching tourists:', err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadQrToken = async (touristId) => {
+    setQrLoading(true);
+    try {
+      const res = await getVerificationToken(touristId);
+      if (res?.data?.rawToken) {
+        setQrToken(res.data.rawToken);
+        const dataUrl = await QRCode.toDataURL(res.data.rawToken, {
+          margin: 1,
+          width: 200,
+          color: { dark: '#0F273D', light: '#FFFFFF' },
+        });
+        setQrUri(dataUrl);
+      }
+    } catch (err) {
+      console.log('QR token generation error:', err.message);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleSelectTourist = (tObj) => {
+    setSelectedTourist(tObj);
+    loadQrToken(tObj.id);
   };
 
   const handleRegister = async () => {
@@ -67,7 +103,6 @@ export default function TouristIDScreen() {
 
       Alert.alert('Registration Successful', `Digital Tourist ID Created: ${res.data.touristCode}`);
       setShowRegForm(false);
-      // Reset form
       setFullName('');
       setPhone('');
       setEmail('');
@@ -86,8 +121,8 @@ export default function TouristIDScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <AppHeader
-        title="Digital Tourist ID"
-        subtitle="Verifiable travel credentials & registration"
+        title={t('digital_id')}
+        subtitle={t('verified_id')}
       />
 
       {loading ? (
@@ -96,31 +131,60 @@ export default function TouristIDScreen() {
           <Text style={styles.loadingText}>Fetching digital ID records...</Text>
         </View>
       ) : selectedTourist ? (
-        /* Digital ID Card */
+        /* Digital ID Card with QR Pass */
         <View style={styles.badgeCard}>
           <View style={styles.cardTop}>
             <View>
               <Text style={styles.cardOrg}>REPUBLIC TOURIST SAFETY PASS</Text>
-              <Text style={styles.cardHeader}>VERIFIED DIGITAL IDENTITY</Text>
+              <Text style={styles.cardHeader}>{t('verified_id')}</Text>
             </View>
             <View style={styles.chipBox}>
-              <Text style={styles.chipText}>SIMULATED ID</Text>
+              <Text style={styles.chipText}>SECURE QR PASS</Text>
             </View>
           </View>
 
           <View style={styles.idCodeContainer}>
-            <Text style={styles.idCodeLabel}>TOURIST CODE</Text>
+            <Text style={styles.idCodeLabel}>{t('tourist_code')}</Text>
             <Text style={styles.idCode}>{selectedTourist.touristCode}</Text>
+          </View>
+
+          {/* QR Verification Box */}
+          <View style={styles.qrContainer}>
+            {qrLoading ? (
+              <View style={styles.qrLoadingBox}>
+                <ActivityIndicator size="small" color={colors.secondary} />
+                <Text style={styles.qrLoadingText}>Generating verification token...</Text>
+              </View>
+            ) : qrUri ? (
+              <View style={styles.qrBox}>
+                <Image source={{ uri: qrUri }} style={styles.qrImage} />
+                <Text style={styles.qrLabel}>CONTACTLESS VERIFICATION TOKEN</Text>
+                <Text style={styles.qrTokenText} numberOfLines={1}>
+                  {qrToken ? qrToken.slice(0, 24) + '...' : ''}
+                </Text>
+                <Pressable
+                  style={styles.qrRefreshBtn}
+                  onPress={() => loadQrToken(selectedTourist.id)}
+                >
+                  <Text style={styles.qrRefreshText}>↻ Refresh Pass Token</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={styles.qrError}>QR Pass Token Unavailable</Text>
+            )}
+            <Text style={styles.qrSecurityNote}>
+              🔒 Privacy Guaranteed: This QR embeds a secure 256-bit token only. No personal phone or emergency contacts are transmitted in the QR code.
+            </Text>
           </View>
 
           <View style={styles.touristInfo}>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>HOLDER NAME</Text>
+              <Text style={styles.infoLabel}>{t('holder_name')}</Text>
               <Text style={styles.infoValue}>{selectedTourist.fullName}</Text>
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>PRIMARY PHONE</Text>
+              <Text style={styles.infoLabel}>{t('primary_phone')}</Text>
               <Text style={styles.infoValue}>{selectedTourist.phone}</Text>
             </View>
 
@@ -132,21 +196,21 @@ export default function TouristIDScreen() {
             )}
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>EMERGENCY CONTACT</Text>
+              <Text style={styles.infoLabel}>{t('emergency_contact')}</Text>
               <Text style={styles.infoValue}>
                 {selectedTourist.emergencyContactName} ({selectedTourist.emergencyContactPhone})
               </Text>
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>SCHEDULED ITINERARY</Text>
+              <Text style={styles.infoLabel}>{t('itinerary')}</Text>
               <Text style={styles.infoValue}>
                 {selectedTourist.itinerary || 'Golden Triangle Corridor (Delhi-Jaipur-Agra)'}
               </Text>
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>PASS EXPIRY</Text>
+              <Text style={styles.infoLabel}>{t('pass_expiry')}</Text>
               <Text style={styles.infoValue}>
                 {new Date(selectedTourist.visitExpiry).toLocaleDateString()}
               </Text>
@@ -255,17 +319,17 @@ export default function TouristIDScreen() {
       {tourists.length > 1 && (
         <View style={styles.selectorCard}>
           <Text style={styles.selectorTitle}>Select Active Tourist Record:</Text>
-          {tourists.map((t) => (
+          {tourists.map((tItem) => (
             <Pressable
-              key={t.id}
+              key={tItem.id}
               style={[
                 styles.touristItem,
-                selectedTourist?.id === t.id && styles.touristItemActive,
+                selectedTourist?.id === tItem.id && styles.touristItemActive,
               ]}
-              onPress={() => setSelectedTourist(t)}
+              onPress={() => handleSelectTourist(tItem)}
             >
-              <Text style={styles.touristItemCode}>{t.touristCode}</Text>
-              <Text style={styles.touristItemName}>{t.fullName}</Text>
+              <Text style={styles.touristItemCode}>{tItem.touristCode}</Text>
+              <Text style={styles.touristItemName}>{tItem.fullName}</Text>
             </Pressable>
           ))}
         </View>
@@ -325,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chipBox: {
-    backgroundColor: '#F6E05E',
+    backgroundColor: '#38BDF8',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -333,7 +397,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#744210',
+    color: '#0C4A6E',
   },
   idCodeContainer: {
     marginTop: 14,
@@ -351,6 +415,69 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1.5,
     marginTop: 2,
+  },
+  qrContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  qrLoadingBox: {
+    paddingVertical: 30,
+    alignItems: 'center',
+  },
+  qrLoadingText: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 6,
+  },
+  qrBox: {
+    alignItems: 'center',
+  },
+  qrImage: {
+    width: 170,
+    height: 170,
+    borderRadius: 8,
+  },
+  qrLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: 8,
+    letterSpacing: 0.5,
+  },
+  qrTokenText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: colors.muted,
+    marginTop: 2,
+  },
+  qrRefreshBtn: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+  },
+  qrRefreshText: {
+    fontSize: 11,
+    color: colors.secondary,
+    fontWeight: '700',
+  },
+  qrError: {
+    color: colors.danger,
+    fontSize: 12,
+  },
+  qrSecurityNote: {
+    fontSize: 10,
+    color: '#64748B',
+    lineHeight: 14,
+    textAlign: 'center',
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
   },
   touristInfo: {
     gap: 8,

@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { appendAuditEvent } from "./auditLedger.service.js";
 
 export async function createSosIncident({ touristId, latitude, longitude, description }) {
   const tourist = await prisma.tourist.findUnique({
@@ -52,6 +53,24 @@ export async function createSosIncident({ touristId, latitude, longitude, descri
       status: "ACTIVE",
     },
   });
+
+  // Append SOS broadcast to tamper-evident audit ledger
+  try {
+    await appendAuditEvent({
+      eventType: "SOS_INCIDENT_CREATED",
+      entityType: "Incident",
+      entityId: incident.id,
+      payload: {
+        referenceCode: `INC-${incident.id.slice(-6).toUpperCase()}`,
+        touristCode: tourist.touristCode,
+        latitude: lat,
+        longitude: lon,
+        severity: "CRITICAL",
+      },
+    });
+  } catch (err) {
+    console.error("Audit ledger logging error on SOS:", err.message);
+  }
 
   return {
     ...incident,
@@ -118,7 +137,7 @@ export async function getIncidentsByTouristId(touristId) {
   return getAllIncidents({ touristId });
 }
 
-export async function updateIncidentStatus(id, status) {
+export async function updateIncidentStatus(id, status, operator = "mobile_client") {
   const validStatuses = ["OPEN", "ACKNOWLEDGED", "RESOLVED", "CANCELLED"];
   const upperStatus = status.toUpperCase().trim();
 
@@ -126,10 +145,27 @@ export async function updateIncidentStatus(id, status) {
     throw new Error(`Invalid incident status. Must be one of: ${validStatuses.join(", ")}`);
   }
 
+  const previous = await prisma.incident.findUnique({ where: { id } });
+
   const updated = await prisma.incident.update({
     where: { id },
     data: { status: upperStatus },
   });
+
+  try {
+    await appendAuditEvent({
+      eventType: "INCIDENT_STATUS_CHANGE",
+      entityType: "Incident",
+      entityId: id,
+      payload: {
+        previousStatus: previous?.status,
+        newStatus: upperStatus,
+        operator,
+      },
+    });
+  } catch (err) {
+    console.error("Audit ledger logging error on incident status update:", err.message);
+  }
 
   return {
     ...updated,
