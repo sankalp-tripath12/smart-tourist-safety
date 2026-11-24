@@ -8,8 +8,8 @@ datasource db {
 }
 
 model Tourist {
-  id                    String         @id @default(cuid())
-  touristCode           String         @unique
+  id                    String              @id @default(cuid())
+  touristCode           String              @unique
   fullName              String
   phone                 String
   email                 String?
@@ -17,10 +17,11 @@ model Tourist {
   emergencyContactPhone String
   itinerary             String?
   visitExpiry           DateTime
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
   incidents             Incident[]
   anomalyAlerts         AnomalyAlert[]
+  verificationTokens    VerificationToken[]
 }
 
 model SafetyZone {
@@ -68,4 +69,44 @@ model AnomalyAlert {
 
   @@index([touristId])
   @@index([status])
+}
+
+model VerificationToken {
+  id         String    @id @default(cuid())
+  touristId  String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  tourist    Tourist   @relation(fields: [touristId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([touristId])
+}
+
+model AuditLedger {
+  id           String   @id @default(cuid())
+  eventType    String   // TOURIST_REGISTRATION, SOS_TRIGGERED, STATUS_CHANGE, QR_VERIFICATION, etc.
+  entityType   String   // Tourist, Incident, AnomalyAlert, VerificationToken, SafetyZone
+  entityId     String
+  payload      String   // Canonical JSON representation of event
+  timestamp    DateTime @default(now())
+  previousHash String
+  currentHash  String
+
+  @@index([eventType])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String   @default("Safety Officer")
+  role         String   @default("ADMIN") // ADMIN, OPERATOR
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
 }
