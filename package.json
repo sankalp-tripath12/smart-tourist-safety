@@ -6,7 +6,8 @@
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix mobile",
     "build:mobile": "cd mobile && npx expo export --platform web",
-    "build:all": "npm run install:all && npm run build:mobile",
-    "start": "node backend/server.js"
+    "build:all": "npm run install:all && npm run build:backend && npm run build:mobile",
+    "start": "node backend/server.js",
+    "build:backend": "cd backend && npx prisma generate --config prisma7.config.ts"
   }
 }
