@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authority Safety Operations Console | Smart Tourist Safety</title>
+  <link rel="stylesheet" href="/admin/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-badge">AUTHORITY OPERATIONS CONSOLE</div>
+        <h2>Smart Tourist Safety & Incident Command</h2>
+        <p>Demonstration Public Safety & Police Monitoring System</p>
+      </div>
+
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="adminEmail">Operator Email</label>
+          <input type="email" id="adminEmail" required value="admin@safetravel.gov.in" placeholder="admin@safetravel.gov.in">
+        </div>
+
+        <div class="form-group">
+          <label for="adminPassword">Operator Password</label>
+          <input type="password" id="adminPassword" required value="Admin@Safety2026!" placeholder="••••••••••••">
+        </div>
+
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-block">
+          Authenticate & Access Command Console
+        </button>
+
+        <div id="loginError" class="alert-box alert-danger hidden"></div>
+
+        <div class="login-demo-hint">
+          <strong>Demo Operator Credentials:</strong><br>
+          Email: <code>admin@safetravel.gov.in</code><br>
+          Password: <code>Admin@Safety2026!</code>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Application Wrapper -->
+  <div id="appContainer" class="app-container">
+    <!-- Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🛡</div>
+        <div class="brand-text">
+          <span class="brand-title">SAFEPOLICE</span>
+          <span class="brand-subtitle">Incident Command</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="overview">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Command Overview</span>
+        </button>
+        <button class="nav-item" data-tab="map">
+          <span class="nav-icon">🗺</span>
+          <span class="nav-label">Risk Map & Clusters</span>
+          <span id="activeSosBadge" class="nav-badge badge-danger hidden">0</span>
+        </button>
+        <button class="nav-item" data-tab="tourists">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tourist Monitoring</span>
+        </button>
+        <button class="nav-item" data-tab="incidents">
+          <span class="nav-icon">🚨</span>
+          <span class="nav-label">Incident Management</span>
+          <span id="openIncidentsBadge" class="nav-badge badge-danger">0</span>
+        </button>
+        <button class="nav-item" data-tab="anomalies">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">Anomaly Alerts</span>
+          <span id="unresolvedAlertsBadge" class="nav-badge badge-warning">0</span>
+        </button>
+        <button class="nav-item" data-tab="verification">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">QR Pass Verifier</span>
+        </button>
+        <button class="nav-item" data-tab="ledger">
+          <span class="nav-icon">⛓</span>
+          <span class="nav-label">Audit Ledger</span>
+          <span id="chainStatusBadge" class="nav-badge badge-success">VALID</span>
+        </button>
+        <button class="nav-item" data-tab="zones">
+          <span class="nav-icon">◎</span>
+          <span class="nav-label">Safety Zones</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="operator-info">
+          <span class="operator-role">Logged in as:</span>
+          <span id="operatorEmail" class="operator-email">admin@safetravel.gov.in</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm btn-block">Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="main-content">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="pageTitle">Command Overview</h1>
+          <p id="pageSubtitle">Live tourist safety telemetrics and incident response status</p>
+        </div>
+
+        <div class="topbar-right">
+          <div class="pulse-indicator">
+            <span class="pulse-dot"></span>
+            <span class="pulse-text">System Live</span>
+          </div>
+          <button id="refreshBtn" class="btn btn-secondary btn-sm">↻ Refresh Data</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: OVERVIEW -->
+      <section id="tab-overview" class="tab-pane active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon stat-blue">👥</div>
+            <div class="stat-data">
+              <span class="stat-value" id="statTotalTourists">0</span>
+              <span class="stat-label">Registered Tourists</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon stat-green">✓</div>
+            <div class="stat-data">
+              <span class="stat-value" id="statActiveTourists">0</span>
+              <span class="stat-label">Active Permits</span>
+            </div>
+          </div>
+
+          <div class="stat-card stat-alert">
+            <div class="stat-icon stat-red">🚨</div>
+            <div class="stat-data">
+              <span class="stat-value text-danger" id="statOpenSos">0</span>
+              <span class="stat-label">Open SOS Emergencies</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon stat-amber">⚡</div>
+            <div class="stat-data">
+              <span class="stat-value text-amber" id="statUnresolvedAnomalies">0</span>
+              <span class="stat-label">Active Anomalies</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon stat-purple">🛡</div>
+            <div class="stat-data">
+              <span class="stat-value" id="statHighRiskTourists">0</span>
+              <span class="stat-label">High-Risk Tourists</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon stat-teal">⛓</div>
+            <div class="stat-data">
+              <span class="stat-value text-teal" id="statChainRecords">0</span>
+              <span class="stat-label">Verified Audit Records</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Incidents and Alerts Split -->
+        <div class="grid-2-col">
+          <div class="card">
+            <div class="card-header">
+              <h3>🚨 Active & Recent Incidents</h3>
+              <button class="btn btn-link btn-sm" onclick="switchTab('incidents')">View All →</button>
+            </div>
+            <div class="card-body table-responsive">
+              <table class="table" id="overviewIncidentsTable">
+                <thead>
+                  <tr>
+                    <th>Ref</th>
+                    <th>Tourist</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="6" class="text-center text-muted">Loading incidents...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>⚡ Recent Movement Anomalies</h3>
+              <button class="btn btn-link btn-sm" onclick="switchTab('anomalies')">View All →</button>
+            </div>
+            <div class="card-body table-responsive">
+              <table class="table" id="overviewAlertsTable">
+                <thead>
+                  <tr>
+                    <th>Tourist</th>
+                    <th>Anomaly Rule</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Detected</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="5" class="text-center text-muted">Loading anomaly alerts...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: GEOGRAPHIC RISK MAP & CLUSTERS -->
+      <section id="tab-map" class="tab-pane">
+        <div class="map-controls card mb-3">
+          <div class="map-controls-row">
+            <div class="legend-items">
+              <span class="legend-badge badge-success">● Safe Zone</span>
+              <span class="legend-badge badge-warning">● Caution Zone</span>
+              <span class="legend-badge badge-danger">● Danger Zone</span>
+              <span class="legend-badge badge-emergency">🚨 Active SOS Beacon</span>
+              <span class="legend-badge badge-tourist">👤 Tourist Position</span>
+            </div>
+            <div class="map-filter-group">
+              <label><input type="checkbox" id="toggleZonesCheck" checked> Safety Zones</label>
+              <label><input type="checkbox" id="toggleTouristsCheck" checked> Tourists</label>
+              <label><input type="checkbox" id="toggleSosCheck" checked> SOS Incidents</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card map-container-card">
+          <div class="map-canvas-wrapper">
+            <svg id="safetyMapSvg" class="safety-map-svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E2E8F0" stroke-width="0.8"/>
+                </pattern>
+              </defs>
+              <rect width="1000" height="600" fill="#F8FAFC" />
+              <rect width="1000" height="600" fill="url(#gridPattern)" />
+
+              <!-- Rendered dynamically -->
+              <g id="mapCorridorGroup"></g>
+              <g id="mapZonesGroup"></g>
+              <g id="mapTouristsGroup"></g>
+              <g id="mapIncidentsGroup"></g>
+            </svg>
+          </div>
+
+          <div id="mapDetailInspector" class="map-inspector">
+            <h4>Location Telemetry Inspector</h4>
+            <p id="inspectorText" class="text-muted">Click any zone, tourist, or emergency beacon on the map to inspect live safety coordinates.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: TOURIST MONITORING -->
+      <section id="tab-tourists" class="tab-pane">
+        <div class="card mb-3">
+          <div class="filter-bar">
+            <input type="text" id="touristSearchInput" class="form-control" placeholder="Search tourist name, code, or phone...">
+            <select id="touristRiskFilter" class="form-control" style="max-width: 200px;">
+              <option value="">All Risk Categories</option>
+              <option value="SAFE">SAFE (80-100)</option>
+              <option value="MODERATE">MODERATE (50-79)</option>
+              <option value="HIGH RISK">HIGH RISK (0-49)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-responsive">
+            <table class="table" id="touristsTable">
+              <thead>
+                <tr>
+                  <th>Tourist Code</th>
+                  <th>Full Name</th>
+                  <th>Phone</th>
+                  <th>Safety Score</th>
+                  <th>Risk Category</th>
+                  <th>Itinerary</th>
+                  <th>Visit Expiry</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="8" class="text-center text-muted">Loading tourists...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: INCIDENT MANAGEMENT -->
+      <section id="tab-incidents" class="tab-pane">
+        <div class="card mb-3">
+          <div class="filter-bar">
+            <div class="btn-group" id="incidentFilterGroup">
+              <button class="btn btn-sm btn-filter active" data-filter="">All</button>
+              <button class="btn btn-sm btn-filter" data-filter="OPEN">OPEN</button>
+              <button class="btn btn-sm btn-filter" data-filter="ACKNOWLEDGED">ACKNOWLEDGED</button>
+              <button class="btn btn-sm btn-filter" data-filter="RESOLVED">RESOLVED</button>
+              <button class="btn btn-sm btn-filter" data-filter="CANCELLED">CANCELLED</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-responsive">
+            <table class="table" id="incidentsTable">
+              <thead>
+                <tr>
+                  <th>Ref ID</th>
+                  <th>Tourist</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>GPS Coordinates</th>
+                  <th>Logged At</th>
+                  <th>Status</th>
+                  <th>Manage Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="8" class="text-center text-muted">Loading incidents...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: ANOMALY MONITORING -->
+      <section id="tab-anomalies" class="tab-pane">
+        <div class="card mb-3">
+          <div class="filter-bar">
+            <div class="btn-group" id="anomalyFilterGroup">
+              <button class="btn btn-sm btn-filter active" data-filter="">All</button>
+              <button class="btn btn-sm btn-filter" data-filter="ACTIVE">ACTIVE</button>
+              <button class="btn btn-sm btn-filter" data-filter="ACKNOWLEDGED">ACKNOWLEDGED</button>
+              <button class="btn btn-sm btn-filter" data-filter="RESOLVED">RESOLVED</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-responsive">
+            <table class="table" id="anomaliesTable">
+              <thead>
+                <tr>
+                  <th>Tourist</th>
+                  <th>Anomaly Type</th>
+                  <th>Severity</th>
+                  <th>Description</th>
+                  <th>Detected At</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="7" class="text-center text-muted">Loading anomalies...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: QR PASS VERIFICATION -->
+      <section id="tab-verification" class="tab-pane">
+        <div class="grid-2-col">
+          <div class="card">
+            <div class="card-header">
+              <h3>🔍 Verify Digital Tourist Pass</h3>
+              <span class="badge badge-info">Zero-Knowledge Token Verifier</span>
+            </div>
+            <div class="card-body">
+              <p class="text-muted mb-3">Enter the QR verification token presented on the tourist mobile application. This endpoint verifies the pass validity without exposing sensitive personal contacts.</p>
+
+              <form id="qrVerifyForm">
+                <div class="form-group">
+                  <label for="qrTokenInput">Verification Token</label>
+                  <input type="text" id="qrTokenInput" class="form-control font-mono" placeholder="st_tok_..." required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Verify Pass with Authority Backend</button>
+              </form>
+
+              <div class="mt-4">
+                <h4>Quick Test Tokens:</h4>
+                <div id="quickTokensContainer" class="quick-tokens-list">
+                  <span class="text-muted">Loading active tourist tokens...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Verification Outcome</h3>
+            </div>
+            <div class="card-body" id="verificationOutcomeContainer">
+              <div class="empty-placeholder">
+                <div class="placeholder-icon">🪪</div>
+                <h4>Awaiting Token Input</h4>
+                <p class="text-muted">Enter a token or click a quick-test token on the left to verify.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: HASH-CHAINED AUDIT LEDGER -->
+      <section id="tab-ledger" class="tab-pane">
+        <div class="card mb-3">
+          <div class="ledger-header-row">
+            <div>
+              <h3>Tamper-Evident SHA-256 Audit Ledger</h3>
+              <p class="text-muted">Every identity registration, SOS event, status update, and verification is cryptographically linked with its predecessor.</p>
+            </div>
+            <button id="verifyLedgerBtn" class="btn btn-teal">🛡 Verify Complete Chain</button>
+          </div>
+          <div id="chainVerificationNotice" class="alert-box alert-success mt-2 hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-responsive">
+            <table class="table" id="ledgerTable">
+              <thead>
+                <tr>
+                  <th>Event ID</th>
+                  <th>Event Type</th>
+                  <th>Entity</th>
+                  <th>Timestamp</th>
+                  <th>Previous SHA-256</th>
+                  <th>Current SHA-256</th>
+                  <th>Integrity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="7" class="text-center text-muted">Loading ledger entries...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 8: SAFETY ZONES -->
+      <section id="tab-zones" class="tab-pane">
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3>Configured Geo-Fenced Safety Zones</h3>
+            <span class="badge badge-info">Jaipur Tourism Corridor</span>
+          </div>
+          <div class="card-body table-responsive">
+            <table class="table" id="zonesTable">
+              <thead>
+                <tr>
+                  <th>Zone Name</th>
+                  <th>Risk Level</th>
+                  <th>Center Coordinates</th>
+                  <th>Radius</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" class="text-center text-muted">Loading safety zones...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin/app.js"></script>
+</body>
+</html>
