@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: smart-tourist-safety
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build:all
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5050
+      - key: DATABASE_URL
+        value: "file:./dev.db"
+      - key: ADMIN_JWT_SECRET
+        generateValue: true

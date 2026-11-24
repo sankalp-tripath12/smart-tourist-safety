@@ -16,6 +16,7 @@ import adminRoutes from "./routes/admin.routes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const adminStaticPath = path.resolve(__dirname, "../../admin");
+const mobileStaticPath = path.resolve(__dirname, "../../mobile/dist");
 
 const app = express();
 
@@ -35,5 +36,19 @@ app.use("/api/safety-score", safetyScoreRoutes);
 app.use("/api/audit-ledger", auditLedgerRoutes);
 app.use("/api/verification", verificationRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Serve exported Expo Web application if available
+app.use(express.static(mobileStaticPath));
+app.get("{*path}", (req, res, next) => {
+  // If request begins with /api or /admin, pass through
+  if (req.path.startsWith("/api") || req.path.startsWith("/admin")) {
+    return next();
+  }
+  res.sendFile(path.join(mobileStaticPath, "index.html"), (err) => {
+    if (err) {
+      next();
+    }
+  });
+});
 
 export default app;

@@ -1,11 +1,18 @@
 // Platform-aware API configuration
-// In Expo Go or development, allow fallback to localhost or LAN IP
-const DEFAULT_URL = "http://10.7.21.185:5050/api";
-const LOCAL_URL = "http://localhost:5050/api";
+// Detect runtime environment: browser window, EXPO_PUBLIC_API_URL, or LAN IP for mobile
+function resolveDefaultApiUrl() {
+  if (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // When running in a web browser, use relative path or current origin
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+  // Fallback for native devices
+  return "http://localhost:5050/api";
+}
 
-export let API_BASE_URL =
-  (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL) ||
-  DEFAULT_URL;
+export let API_BASE_URL = resolveDefaultApiUrl();
 
 export function setApiBaseUrl(newUrl) {
   if (newUrl) {
@@ -32,69 +39,42 @@ async function request(endpoint, options = {}) {
 
     return data;
   } catch (error) {
-    // If LAN IP fails in local web/node or simulator, attempt localhost fallback once
-    if (API_BASE_URL !== LOCAL_URL && error.message?.includes("Network request failed")) {
-      try {
-        const fallbackUrl = `${LOCAL_URL}${endpoint}`;
-        const fbResponse = await fetch(fallbackUrl, {
-          ...options,
-          headers: {
-            "Content-Type": "application/json",
-            ...options.headers,
-          },
-        });
-        const fbData = await fbResponse.json();
-        if (fbResponse.ok) {
-          API_BASE_URL = LOCAL_URL;
-          return fbData;
-        }
-      } catch {
-        // Fallback also failed, bubble original error
-      }
-    }
+    // If running on localhost and request fails, return error cleanly
     throw error;
   }
 }
 
-// Health & System
-export function getHealth() {
+export async function getHealth() {
   return request("/health");
 }
 
-// Tourist APIs
-export function registerTourist(touristData) {
+export async function registerTourist(touristData) {
   return request("/tourists", {
     method: "POST",
     body: JSON.stringify(touristData),
   });
 }
 
-export function getTourists() {
+export async function getTourists() {
   return request("/tourists");
 }
 
-export function getTouristById(id) {
+export async function getTouristById(id) {
   return request(`/tourists/${id}`);
 }
 
-// Geo-Fence & Safety Zones
-export function getSafetyZones() {
+export async function getSafetyZones() {
   return request("/geofence/zones");
 }
 
-export function getSafetyZoneById(id) {
-  return request(`/geofence/zones/${id}`);
-}
-
-export function evaluateLocationZones(latitude, longitude) {
+export async function evaluateGeofence(latitude, longitude) {
   return request("/geofence/evaluate", {
     method: "POST",
     body: JSON.stringify({ latitude, longitude }),
   });
 }
 
-// Safety Score
-export function getSafetyScore(touristId, latitude, longitude) {
+export async function getSafetyScore(touristId, latitude, longitude) {
   let endpoint = `/safety-score/${touristId}`;
   if (latitude !== undefined && longitude !== undefined) {
     endpoint += `?latitude=${latitude}&longitude=${longitude}`;
@@ -102,74 +82,81 @@ export function getSafetyScore(touristId, latitude, longitude) {
   return request(endpoint);
 }
 
-// Incident & SOS
-export function triggerSos(sosData) {
-  return request("/incidents/sos", {
+export async function calculateSafetyScore(payload) {
+  return request("/safety-score/calculate", {
     method: "POST",
-    body: JSON.stringify(sosData),
+    body: JSON.stringify(payload),
   });
 }
 
-export function getAllIncidents(params = {}) {
+export async function triggerSos(incidentData) {
+  return request("/incidents/sos", {
+    method: "POST",
+    body: JSON.stringify(incidentData),
+  });
+}
+
+export async function getIncidents(params = {}) {
   const query = new URLSearchParams(params).toString();
   return request(`/incidents${query ? `?${query}` : ""}`);
 }
 
-export function getTouristIncidents(touristId) {
+export async function getIncidentById(id) {
+  return request(`/incidents/${id}`);
+}
+
+export async function getTouristIncidents(touristId) {
   return request(`/incidents/tourist/${touristId}`);
 }
 
-export function updateIncidentStatus(id, status) {
+export async function updateIncidentStatus(id, status, notes = "") {
   return request(`/incidents/${id}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, notes }),
   });
 }
 
-// Anomaly Detection
-export function detectAnomalies(data) {
+export async function detectAnomalies(touristId, currentCoordinates) {
   return request("/anomalies/detect", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ touristId, currentCoordinates }),
   });
 }
 
-export function simulateAnomaly(data) {
+export async function simulateAnomaly(touristId, scenarioType) {
   return request("/anomalies/simulate", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ touristId, scenarioType }),
   });
 }
 
-export function getAllAnomalies(params = {}) {
+export async function getAnomalies(params = {}) {
   const query = new URLSearchParams(params).toString();
   return request(`/anomalies${query ? `?${query}` : ""}`);
 }
 
-export function getTouristAnomalies(touristId) {
+export async function getTouristAnomalies(touristId) {
   return request(`/anomalies/tourist/${touristId}`);
 }
 
-export function updateAnomalyStatus(id, status) {
+export async function updateAnomalyStatus(id, status) {
   return request(`/anomalies/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
 }
 
-// QR Verification APIs
-export function getVerificationToken(touristId) {
-  return request("/verification/tokens", {
+export async function getVerificationToken(touristId) {
+  return request(`/verification/token/${touristId}`);
+}
+
+export async function verifyQrToken(token) {
+  return request("/verification/verify", {
     method: "POST",
-    body: JSON.stringify({ touristId }),
+    body: JSON.stringify({ token }),
   });
 }
 
-export function verifyQrToken(token) {
-  return request(`/verification/${encodeURIComponent(token)}`);
-}
-
-// Audit Ledger Verification
-export function verifyAuditLedger() {
+export async function verifyAuditLedger() {
   return request("/audit-ledger/verify");
 }
